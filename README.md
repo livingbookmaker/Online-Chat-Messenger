@@ -15,3 +15,5 @@ https://qiita.com/mashed_potatoes/items/2338852a41c6aaf8efbb
 https://github.com/ayan2809/Multi-Client-Socket-using-UDP
 
 https://ittrip.xyz/python/python-udp-socket-guide
+
+https://daeudaeu.com/tkinter_after/#after_cancel_after
