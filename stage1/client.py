@@ -1,6 +1,7 @@
 import socket
-import time
+import tkinter
 import threading
+import sys
 
 #ソケットを用意する
 serverAddressPort = ("0.0.0.0", 9001)
@@ -30,9 +31,26 @@ username = input_username()
 #サーバーからメッセージを受信する
 threading.Thread(target=receive_messages, args = (sock,), daemon=True).start()
 
+#一定時間入力がなかった場合にチャットを自動で終了するための関数
+def quitChat(udp_socket):
+    print("チャットを終了します。")
+    quitChat = "quitchat" + username
+    udp_socket.sendto(quitChat.encode(), serverAddressPort)
+    sock.close()
+    sys.exit()
+    
+autoQuit = tkinter.Tk()
+
 #チャットメッセージを入力し、サーバーに送信する（「q」が入力された場合、チャットを終了する）
 while True:
+    #tkinterのafterメソッドを使って一定時間で自動終了の関数を実行する
+    afterID = autoQuit.after(60000, quitChat, sock)
+
     msgFromClient = input()
+
+    #メッセージが入力されたらafterメソッドによる自動終了関数の実行予約をキャンセルする
+    autoQuit.after_cancel(afterID)
+
     if msgFromClient == "q":
         print("チャットを終了します。")
         quitChat = "quitchat" + username
