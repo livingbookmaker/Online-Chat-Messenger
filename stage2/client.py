@@ -18,8 +18,7 @@ def receive_messages(udp_socket):
         data, address = udp_socket.recvfrom(4096)
         print(data.decode())
         if data.decode() == "ホストが退出したため、チャットルームを解散します。":
-            print("チャットを終了します。")
-            sys.exit()
+            print("「q」を入力してチャットを終了してください。")
 
 
 #適切なユーザーネームが入力されるまで再起する関数
@@ -38,8 +37,8 @@ def input_username():
 def quitChat(udp_socket):
     print("チャットを終了します。")
     command = "quitchat"
-    msg = f"{command},{chatroomName},{username},dummy"
-    udp_socket.sendto(msg.encode(), udp_serverAddressPort)
+    msg = f"{command},{token},dummy"
+    udp_socket.sendto(msg.encode("utf-8"), udp_serverAddressPort)
     udp_socket.close()
     sys.exit()
 autoQuit = tkinter.Tk()
@@ -55,6 +54,7 @@ except tcp_sock.error as err:
     print(err)
     sys.exit(1)
 
+#TCP接続でサーバーにチャットルーム名とユーザーネームを送ってトークンをもらい、そのトークンを使ってUDP接続を行ってチャットルームに参加する
 try:
     chatroomName = input("チャットルーム名を入力してください: ")
     username = input("ユーザーネームを入力してください: ")
@@ -66,6 +66,12 @@ try:
     body = chatroomName + username
     tcp_sock.send(header)
     tcp_sock.send(body.encode("utf-8"))
+
+    token = tcp_sock.recv(4096)
+    token = token.decode()
+
+    joinMsg = f"join,{token},dummy"
+    udp_sock.sendto(joinMsg.encode("utf-8"), udp_serverAddressPort)
     
 finally:
     print("チャットを開始します。")
@@ -90,6 +96,6 @@ while True:
 
     else:
         command = "usualchat"
-        data = f"{command},{chatroomName},{username},{msgFromClient}"
+        data = f"{command},{token},{msgFromClient}"
         bytesTosend = data.encode()
         udp_sock.sendto(bytesTosend, udp_serverAddressPort)

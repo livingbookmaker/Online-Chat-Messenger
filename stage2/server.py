@@ -1,5 +1,6 @@
 import socket
 import threading
+import secrets
 
 #UDPソケットを用意する
 server_address = "0.0.0.0"
@@ -12,7 +13,10 @@ udp_sock.bind((server_address, server_port))
 #TCPソケットを用意する
 tcp_serverAddressPort = ("0.0.0.0", 9002)
 tcp_sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-tcp_sock.close
+try:
+    tcp_sock.close
+except:
+    pass
 tcp_sock.bind(tcp_serverAddressPort)
 tcp_sock.listen()
 
@@ -22,7 +26,15 @@ print("サーバー起動")
 chatrooms = {}
 tokens = {}
 
-#クライアントからの初回通信時にチャットルームやユーザーネームを確認する関数
+#トークンを生成する関数
+def token_generator():
+    token = secrets.token_hex(16)
+    if token not in tokens and "," not in token:
+        return token
+    else:
+        return token_generator()
+
+#クライアントからの初回通信時にチャットルームを確認し、トークンを生成して渡す関数
 def first_contact(tcp_socket):
     while True:
         connection, client_address = tcp_sock.accept()
@@ -39,17 +51,22 @@ def first_contact(tcp_socket):
                 chatrooms[chatroomName] = []
                 msg = username + "が" + chatroomName + "を作成しました。"
                 print(msg)
-                print(chatrooms[chatroomName])
 
             else:
                 msg = username + "が" + chatroomName + "に参加しました。"
                 print(msg)
+
+            token = token_generator()
+            print("トークンを生成しました。")
+            tokens[token] = [chatroomName, username]
+            connection.sendall(token.encode("utf-8"))
 
         except Exception as e:
             print("エラー: " + str(e))
         finally:
             connection.close()
 
+#スレッドでクライアントからの初回通信を待つ
 threading.Thread(target=first_contact, args = (tcp_sock,), daemon=True).start()
 
 #クライアントから受信したデータを処理する
@@ -61,28 +78,54 @@ while (True):
     #受信したデータをデコードする
     data = message.decode()
 
-    command, chatroomName, username, message = data.split(",", 3)
+    #受信したデータを「コマンド」「トークン」「メッセージ」に分解する
+    command, token, message = data.split(",", 2)
+    if token not in tokens:
+        msg = "そのトークンは使用できません。"
+        print("存在しないトークンからの通信がありました。")
+        udp_sock.sendto(msg.encode("utf-8"), address)
+        continue
+    
+    #トークンが存在する場合は、トークンを「チャットルーム名」と「ユーザーネームに分解する」
+    chatroomName = tokens[token][0]
+    username = tokens[token][1]
 
-    if address not in chatrooms[chatroomName]:
-        chatrooms[chatroomName].append(address)
-
-    if command == "quitchat":
+    #コマンドが「join」の場合は、チャットルームにクライアントのアドレスを追加する
+    if command == "join":
+        if address not in chatrooms[chatroomName]:
+            chatrooms[chatroomName].append(address)
+            msg = f"{username}がチャットに参加しました。"
+            for client in chatrooms[chatroomName]:
+                if client != address:
+                    udp_sock.sendto(msg.encode("utf-8"), client)
+    
+    #存在しないチャットルームへの通信があった場合（ホスト退出後の非ホストからの通信などの場合）は、チャットルームが存在しないことをクライアントに伝える
+    elif chatroomName not in chatrooms:
+        msg = f"チャットルーム「{chatroomName}」は存在しません。「q」を入力してチャットを終了してください。"
+        print("存在しないチャットルームへの通信がありました。")
+        udp_sock.sendto(msg.encode("utf-8"), address)
+    
+    #コマンドが「quitchat」の場合、チャットルームの解散またはチャットルームからの退出処理を行う
+    elif command == "quitchat":
         if address == chatrooms[chatroomName][0]:
-            msg = f"ホストが退出したため、チャットルームを解散します。"
+            msg = "ホストが退出したため、チャットルームを解散します。"
+            print(f"チャットルーム{chatroomName}を解散しました。")
             for client in chatrooms[chatroomName]:
                 if client != address:
                     udp_sock.sendto(msg.encode("utf-8"), client)
             chatrooms.pop(chatroomName)
             
         else:
-            msg = f"{username}が退出しました。"
+            msg = f"{username}がチャットルーム「{chatroomName}」から退出しました。"
+            print(msg)
             chatrooms[chatroomName].remove(address)
             for client in chatrooms[chatroomName]:
                 udp_sock.sendto(msg.encode("utf-8"), client)
 
+    #上記以外の場合、通常のメッセージ処理を行い、チャットルーム内の各クライアントにメッセージを送信する
     else:
         msg = username + ": " + message
-        print(msg)
+        print(f"{chatroomName}: {msg}")
         bytesToSend = str.encode(msg)
 
         for client in chatrooms[chatroomName]:
