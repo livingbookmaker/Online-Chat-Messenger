@@ -23,7 +23,7 @@ def input_username():
     
     else:
         print("ユーザーネームは9文字以内にしてください。")
-        input_username()
+        return input_username()
 
 #ユーザーネームを入力し、サーバーに伝える
 username = input_username()
