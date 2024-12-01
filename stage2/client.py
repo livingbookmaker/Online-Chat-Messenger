@@ -20,19 +20,6 @@ def receive_messages(udp_socket):
         if data.decode() == "ホストが退出したため、チャットルームを解散します。":
             print("「q」を入力してチャットを終了してください。")
 
-
-#適切なユーザーネームが入力されるまで再起する関数
-def input_username():
-    usernameInput = input("ユーザーネームを入力してください（最大9文字）：")
-    if len(usernameInput) <= 9:
-        addUsername = "addusername" + usernameInput
-        udp_sock.sendto(addUsername.encode(), udp_serverAddressPort)
-        return usernameInput
-    
-    else:
-        print("ユーザーネームは9文字以内にしてください。")
-        input_username()
-
 #一定時間入力がなかった場合にチャットを自動で終了するための関数
 def quitChat(udp_socket):
     print("チャットを終了します。")
